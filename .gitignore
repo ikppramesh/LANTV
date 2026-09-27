@@ -1,3 +1,15 @@
 node_modules/
 hls/
 *.log
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/keystore/
+android/*.iml
+android/.idea/
+android/captures/
+android/.cxx/

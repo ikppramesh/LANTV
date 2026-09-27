@@ -1,13 +1,22 @@
 # LanTv
 
 Turn your local movie/TV libraries into always-on, randomly shuffled **TV channels** that
-any device on your LAN can watch by opening a link — no seeking, no "pick an episode," just
-tune in and it's already playing something, like a real TV.
+any device on your LAN can watch — no seeking, no "pick an episode," just tune in and it's
+already playing something, like a real TV.
 
 Point it at a handful of folders (say, `GOT`, `LOTR`, a "New releases" dump, and a big mixed
 `IRMAX` library), and each one becomes its own channel with its own shuffled, infinite
-playlist. Switch channels from a bar in the browser, a bookmarked link per device, or VLC's
-own playlist view.
+playlist. Watch it from **any browser on your LAN, VLC, or the included Android app** —
+switch channels from a bar in the browser, a bookmarked link per device, VLC's own playlist
+view, or the app's channel bar on your phone/tablet/Android TV box.
+
+This repo has two parts:
+
+- **The server** (`src/`, root of the repo) — a Node.js + ffmpeg service you run on a Mac on
+  your network. This is the thing that actually scans your folders and streams video.
+- **The Android app** (`android/`) — a small installable app that's really just the browser
+  player in a native wrapper, for a proper home-screen icon instead of typing a URL every
+  time. A ready-to-install APK is on the [Releases page](../../releases).
 
 ## Features
 
@@ -24,8 +33,9 @@ own playlist view.
 - **Proper HDR → SDR tonemapping** (not just a naive strip of HDR metadata) for HDR10/Dolby
   Vision sources, using `ffmpeg-full`'s `zscale`/`zimg` support.
 - **Works in the browser** (built-in fullscreen player with a channel switcher, now-playing
-  overlay, and a skip button) **and in VLC / any HLS-capable player** — either per-channel
-  URLs or one combined `.m3u` playlist listing every channel.
+  overlay, and a skip button), **in VLC / any HLS-capable player** — either per-channel URLs
+  or one combined `.m3u` playlist listing every channel — **and as an installable Android
+  app** with its own launcher icon (APK on the [Releases page](../../releases)).
 - **Resilient by design:** corrupt/unreadable files are auto-skipped, disconnected network
   volumes are retried automatically without a restart, and the whole service can be set up
   to auto-start on login and auto-restart if it ever crashes.
@@ -90,6 +100,10 @@ Each channel is an independent state machine (`src/channel.js`):
   If `ffmpeg-full` isn't present, LanTv still works but falls back to plain `ffmpeg` without
   HDR tonemapping (HDR sources will look washed out).
 
+To build the Android app from source (optional — a ready APK is on the
+[Releases page](../../releases)): JDK 17 and the Android SDK. See
+[android/README.md](android/README.md).
+
 ## Setup
 
 ```bash
@@ -140,6 +154,45 @@ to enable sound — browsers block autoplay-with-sound until a user gesture.
 If a channel is cold (nobody's watched it recently, so it's paused), the very first request
 to its playlist is held server-side for a few seconds until the first HLS segment actually
 exists, rather than returning a 404 that VLC won't retry on its own.
+
+## Android App
+
+<img src="android/docs/icon-512.png" width="96" align="right" alt="LanTv app icon">
+
+A real installable Android app — same channel bar, same shuffle-loop playback, same
+now-playing overlay as the browser, just packaged with its own icon so it lives on your
+phone/tablet/Android TV box's home screen instead of a bookmark.
+
+It's a `WebView` pointed at your LanTv server (see [android/README.md](android/README.md) for
+why that's the right call here, and for build-from-source instructions). Tested end-to-end on
+a real device: installs, launches, connects over Wi-Fi, and plays live transcoded HLS.
+
+### Install it
+
+1. Download the APK from the **[Releases page](../../releases/latest)** (`LanTv.apk`).
+2. On the Android device, open the downloaded file. If this is the first APK you've installed
+   outside the Play Store, Android will ask you to allow installs from that source
+   (Settings → apps that can install unknown apps → allow for your browser/file manager) —
+   approve it, then install.
+3. Open the LanTv app. The first time, it asks for your server address — enter the `.local`
+   link your Mac printed when you ran `npm start` (see [Setup](#setup) above), e.g.
+   `http://Rameshs-MacBook-Pro-2.local:8000`, or the plain IP if `.local` doesn't resolve on
+   your device/network.
+4. Tap **Connect**. It remembers the address after that — you only do this once.
+
+If the address ever changes (new network, `.local` not resolving, etc.), tap the small gear
+icon in the top-right corner to update it.
+
+### Notes
+
+- The app locks to landscape and keeps the screen from sleeping while open — it's meant to be
+  left running like a TV.
+- It only works on the same LAN as the Mac running LanTv (it's not exposed to the internet).
+- The APK is signed with a self-generated key (not a Play Store / Google key) — that's why
+  Android calls it an "unknown source." That's expected for a personal LAN app.
+- Prefer to build it yourself instead of trusting a downloaded APK? See
+  [android/README.md](android/README.md) — `cd android && ./gradlew assembleDebug`, or
+  `adb install` it directly onto a connected device with `./gradlew installDebug`.
 
 ## Configuration
 
@@ -226,8 +279,11 @@ LANTV/
 │   ├── server.js             # Express app: routes, per-channel HLS serving, idle-pause loop
 │   ├── channel.js            # per-channel state machine: queue, ffmpeg lifecycle, HDR detection
 │   └── scanner.js            # recursive folder walk + filename cleanup for display titles
-└── public/
-    └── index.html            # fullscreen HLS player, channel bar, now-playing overlay
+├── public/
+│   └── index.html            # fullscreen HLS player, channel bar, now-playing overlay
+└── android/                  # installable Android app (WebView wrapper) — see android/README.md
+    ├── app/src/main/java/com/lantv/app/MainActivity.kt
+    └── app/src/main/res/     # launcher icons generated from image.png, layout, theme
 ```
 
 ## Notes & troubleshooting
@@ -235,8 +291,8 @@ LANTV/
 - **HDR looks washed out:** make sure `ffmpeg-full` is installed (`brew install ffmpeg-full`).
   LanTv auto-detects it at `/opt/homebrew/opt/ffmpeg-full/bin` and falls back to plain
   `ffmpeg` (no tonemapping) if it's not there.
-  - `channels.m3u` uses `application/vnd.apple.mpegurl` and pulls its own hostname from the
-  requesting device, so the same link works whether you access it via `.local` or by IP.
+- `channels.m3u` builds its URLs from the requesting device's own host header, so the same
+  link works whether you access it via `.local` or by IP.
 - A corrupt or unreadable file is retried once; after 2 failures it's permanently skipped for
   that run (rescans will try it again from scratch).
 - If a network/FTP-mounted volume disconnects, the affected channel keeps retrying every 10s
