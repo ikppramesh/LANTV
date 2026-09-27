@@ -1,0 +1,19 @@
+{
+  "channels": [
+    { "id": "got", "name": "GOT TV", "libraries": ["/Volumes/IR_Movies/GOT"] },
+    { "id": "lotr", "name": "LOTR TV", "libraries": ["/Volumes/IR_Movies/LOTR-EXtended"] },
+    { "id": "new", "name": "New TV", "libraries": ["/Volumes/IR_Movies/New"] },
+    { "id": "irmax", "name": "IRMAX TV", "libraries": ["/Volumes/IRMAX"] }
+  ],
+  "extensions": [".mkv", ".mp4", ".m4v", ".avi", ".mov", ".ts", ".wmv"],
+  "excludeDirNames": ["$RECYCLE.BIN", "System Volume Information", "@eaDir"],
+  "port": 8000,
+  "idleStopSeconds": 90,
+  "video": {
+    "maxWidth": 1920,
+    "videoBitrate": "6000k",
+    "audioBitrate": "192k",
+    "hlsSegmentSeconds": 6,
+    "hlsListSize": 8
+  }
+}

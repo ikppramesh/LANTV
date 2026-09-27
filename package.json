@@ -1,0 +1,12 @@
+{
+  "name": "lantv",
+  "version": "1.0.0",
+  "description": "A random-shuffle 'TV channel' that streams your local movie/show libraries over LAN as one continuous HLS link.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LanTv</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #video { width: 100vw; height: 100vh; object-fit: contain; background: #000; }
+  #channels {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; gap: 8px; padding: 10px 14px; box-sizing: border-box;
+    background: linear-gradient(rgba(0,0,0,0.75), transparent);
+    font-family: -apple-system, Helvetica, Arial, sans-serif;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  body:hover #channels, body.show-overlay #channels { opacity: 1; }
+  .chbtn {
+    background: rgba(255,255,255,0.12); border: none; color: #fff;
+    padding: 7px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  .chbtn:hover { background: rgba(255,255,255,0.25); }
+  .chbtn.active { background: #e64545; }
+  #overlay {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 14px 20px; box-sizing: border-box;
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    color: #fff; font-family: -apple-system, Helvetica, Arial, sans-serif;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  body:hover #overlay, body.show-overlay #overlay { opacity: 1; }
+  #title { font-size: 18px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+  #next { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+  #skip {
+    background: rgba(255,255,255,0.15); border: none; color: #fff;
+    padding: 8px 16px; border-radius: 6px; font-size: 14px; cursor: pointer;
+  }
+  #skip:hover { background: rgba(255,255,255,0.3); }
+  #unmute {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); color: #fff; border: none;
+    font-size: 22px; font-family: inherit; cursor: pointer;
+  }
+  #unmute.hidden { display: none; }
+</style>
+</head>
+<body>
+  <video id="video" autoplay muted playsinline></video>
+  <button id="unmute">🔊 Tap to enable sound</button>
+  <div id="channels"></div>
+  <div id="overlay">
+    <div>
+      <div id="title">Loading...</div>
+      <div id="next"></div>
+    </div>
+    <button id="skip">Skip ⏭</button>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+  const video = document.getElementById("video");
+  const unmuteBtn = document.getElementById("unmute");
+  const titleEl = document.getElementById("title");
+  const nextEl = document.getElementById("next");
+  const channelsEl = document.getElementById("channels");
+  const skipBtn = document.getElementById("skip");
+
+  let hls = null;
+  let currentChannel = null;
+  let allChannels = [];
+
+  unmuteBtn.addEventListener("click", () => {
+    video.muted = false;
+    unmuteBtn.classList.add("hidden");
+  });
+
+  function attach(channelId) {
+    if (hls) { hls.destroy(); hls = null; }
+    const src = `/hls/${channelId}/stream.m3u8`;
+
+    if (Hls.isSupported()) {
+      hls = new Hls({ liveSyncDurationCount: 3 });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (!data.fatal) return;
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            setTimeout(() => hls.startLoad(), 2000);
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            hls.recoverMediaError();
+            break;
+          default:
+            setTimeout(() => attach(channelId), 3000);
+            break;
+        }
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = src;
+    }
+    video.play().catch(() => {});
+  }
+
+  function selectChannel(id, opts = {}) {
+    currentChannel = id;
+    attach(id);
+    renderChannelBar();
+    titleEl.textContent = "Loading channel...";
+    nextEl.textContent = "";
+    if (!opts.skipHistory) {
+      const url = new URL(window.location);
+      url.searchParams.set("ch", id);
+      history.replaceState(null, "", url);
+    }
+  }
+
+  function renderChannelBar() {
+    channelsEl.innerHTML = "";
+    for (const c of allChannels) {
+      const btn = document.createElement("button");
+      btn.className = "chbtn" + (c.id === currentChannel ? " active" : "");
+      btn.textContent = c.name;
+      btn.addEventListener("click", () => selectChannel(c.id));
+      channelsEl.appendChild(btn);
+    }
+  }
+
+  async function pollStatus() {
+    if (!currentChannel) return;
+    try {
+      const res = await fetch(`/api/status/${currentChannel}`);
+      const data = await res.json();
+      titleEl.textContent = data.current ? "▶ " + data.current.title : "Starting channel...";
+      nextEl.textContent = data.upNext && data.upNext.length
+        ? "Up next: " + data.upNext.slice(0, 3).join("  •  ")
+        : "";
+    } catch (e) { /* server not ready yet */ }
+  }
+
+  skipBtn.addEventListener("click", () => {
+    if (currentChannel) fetch(`/api/skip/${currentChannel}`, { method: "POST" });
+  });
+
+  async function init() {
+    const res = await fetch("/api/channels");
+    allChannels = await res.json();
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("ch");
+    const initial = allChannels.find((c) => c.id === requested)
+      ? requested
+      : (allChannels[0] && allChannels[0].id);
+    if (initial) selectChannel(initial, { skipHistory: !!requested && requested === initial });
+    pollStatus();
+    setInterval(pollStatus, 5000);
+  }
+  init();
+</script>
+</body>
+</html>
