@@ -18,6 +18,39 @@ for (const c of config.channels) {
 const caffeinate = spawn("caffeinate", ["-dimsu"], { stdio: "ignore" });
 process.on("exit", () => caffeinate.kill());
 
+app.disable("x-powered-by");
+
+// Security headers. The CSP allows exactly what the player page loads: its own
+// inline script/style, hls.js from jsDelivr, same-origin API/HLS requests, and
+// blob: URLs that hls.js uses for MediaSource playback and its worker.
+const securityHeaders = {
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "media-src 'self' blob:",
+    "connect-src 'self'",
+    "worker-src 'self' blob:",
+    "font-src 'self'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; "),
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), interest-cohort=()",
+};
+app.use((req, res, next) => {
+  res.set(securityHeaders);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 app.get("/api/channels", (req, res) => {
