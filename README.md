@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="android/docs/icon-512.png" width="120" alt="LanTv logo">
+</p>
+
 # LanTv
 
 Turn your local movie/TV libraries into always-on, randomly shuffled **TV channels** that
@@ -17,6 +21,21 @@ This repo has two parts:
 - **The Android app** (`android/`) — a small installable app that's really just the browser
   player in a native wrapper, for a proper home-screen icon instead of typing a URL every
   time. A ready-to-install APK is on the [Releases page](../../releases).
+
+## Quick start
+
+```bash
+brew install ffmpeg-full            # one-time: HDR tonemapping support
+git clone https://github.com/ikppramesh/LANTV.git && cd LANTV
+npm install
+# edit config.json: point each channel's "libraries" at your own folders
+npm start
+```
+
+Then open the `.local` link the console prints (e.g. `http://<your-mac-name>.local:8000/`)
+from any phone, TV or laptop on the same Wi-Fi, or load `/channels.m3u` in VLC. On Android,
+install `LanTv.apk` from the [Releases page](../../releases/latest). Details are in
+[Setup](#setup) and [Configuration](#configuration) below.
 
 ## Features
 
