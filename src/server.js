@@ -21,12 +21,12 @@ process.on("exit", () => caffeinate.kill());
 app.disable("x-powered-by");
 
 // Security headers. The CSP allows exactly what the player page loads: its own
-// inline script/style, hls.js from jsDelivr, same-origin API/HLS requests, and
+// script file and inline style, hls.js from jsDelivr, same-origin API/HLS requests, and
 // blob: URLs that hls.js uses for MediaSource playback and its worker.
 const securityHeaders = {
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "script-src 'self' https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
     "media-src 'self' blob:",
